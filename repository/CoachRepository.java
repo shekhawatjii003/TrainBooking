@@ -9,5 +9,10 @@ import java.util.List;
 public interface CoachRepository extends JpaRepository<Coach, Long> {
     List<Coach> findByTrain(Train train);
     Boolean existsByTrainAndCoachNumber(Train train,String coachNumber);
+    boolean existsByTrainAndCoachNumberAndIdNot(
+            Train train,
+            String coachNumber,
+            Long id
+    );
 
 }

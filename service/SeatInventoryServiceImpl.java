@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import com.example.trainbooking.exception.ResourceNotFoundException;
+import com.example.trainbooking.exception.DuplicateResourceException;
 
 @Service
 public class SeatInventoryServiceImpl implements SeatInventoryService{
@@ -19,7 +21,7 @@ public class SeatInventoryServiceImpl implements SeatInventoryService{
     @Override
     public SeatInventory createSeatInventory(SeatInventory seatInventory) {
         if(seatInventoryRepository.existsByTrainJourneyAndSeat(seatInventory.getTrainJourney(), seatInventory.getSeat())){
-            throw new RuntimeException("Already exists");
+            throw new DuplicateResourceException("Already exists");
         }
         return seatInventoryRepository.save(seatInventory);
     }
@@ -30,7 +32,7 @@ public class SeatInventoryServiceImpl implements SeatInventoryService{
         if(seatInventory.isPresent()){
             return seatInventory.get();
         }
-        throw new RuntimeException("Not found");
+        throw new ResourceNotFoundException("Not found");
     }
 
     @Override
@@ -44,7 +46,7 @@ public class SeatInventoryServiceImpl implements SeatInventoryService{
         Optional<SeatInventory> optional = seatInventoryRepository.findById(id);
 
         if (!optional.isPresent()) {
-            throw new RuntimeException("Seat Inventory not found");
+            throw new ResourceNotFoundException("Seat Inventory not found");
         }
         SeatInventory existingInventory = optional.get();
         existingInventory.setSeatStatus(seatInventory.getSeatStatus());
@@ -58,7 +60,7 @@ public class SeatInventoryServiceImpl implements SeatInventoryService{
             seatInventory.get().setActive(false);
             return seatInventoryRepository.save(seatInventory.get());
         }
-        throw new RuntimeException("Not found");
+        throw new ResourceNotFoundException("Not found");
     }
 
     @Override
@@ -68,7 +70,7 @@ public class SeatInventoryServiceImpl implements SeatInventoryService{
 
     @Override
     public List<SeatInventory> getInventoryByJourneyAndStatus(TrainJourney trainJourney, SeatStatus status) {
-        return seatInventoryRepository.findByTrainJourneyAndStatus(trainJourney, status);
+        return seatInventoryRepository.findByTrainJourneyAndSeatStatus(trainJourney, status);
     }
 
     @Override
@@ -77,6 +79,6 @@ public class SeatInventoryServiceImpl implements SeatInventoryService{
         if(seatInventory.isPresent()){
             return seatInventory.get();
         }
-        throw new RuntimeException("Not found");
+        throw new ResourceNotFoundException("Not found");
     }
 }

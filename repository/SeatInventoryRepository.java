@@ -11,7 +11,10 @@ import java.util.Optional;
 
 public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Long> {
     List<SeatInventory> findByTrainJourney(TrainJourney trainJourney);
-    List<SeatInventory> findByTrainJourneyAndStatus(TrainJourney trainJourney, SeatStatus status);
+    List<SeatInventory> findByTrainJourneyAndSeatStatus(
+            TrainJourney trainJourney,
+            SeatStatus seatStatus
+    );
     Optional<SeatInventory> findByTrainJourneyAndSeat(TrainJourney trainJourney, Seat seat);
     Boolean existsByTrainJourneyAndSeat(TrainJourney trainJourney, Seat seat);
 }

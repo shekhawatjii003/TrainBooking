@@ -5,6 +5,8 @@ import com.example.trainbooking.repository.PassengerRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import com.example.trainbooking.exception.ResourceNotFoundException;
+import com.example.trainbooking.exception.SeatNotAvailableException;
 
 @Service
 public class ReservationServiceImpl implements ReservationService{
@@ -19,13 +21,13 @@ public class ReservationServiceImpl implements ReservationService{
         SeatInventory inventory =
                 seatInventoryService.getInventoryByJourneyAndSeat(trainJourney, seat);
         if (inventory == null) {
-            throw new RuntimeException("Seat inventory not found");
+            throw new ResourceNotFoundException("Seat inventory not found");
         }
         if (!inventory.getActive()) {
-            throw new RuntimeException("Seat inventory is not active");
+            throw new SeatNotAvailableException("Seat inventory is not active");
         }
         if (inventory.getSeatStatus() != SeatStatus.AVAILABLE) {
-            throw new RuntimeException("Seat is not available");
+            throw new SeatNotAvailableException("Seat is not available");
         }
         inventory.setSeatStatus(SeatStatus.LOCKED);
         seatInventoryService.updateSeatInventory(
@@ -37,10 +39,10 @@ public class ReservationServiceImpl implements ReservationService{
     public void confirmReservation(TrainJourney trainJourney, Seat seat, Booking booking) {
     SeatInventory inventory=seatInventoryService.getInventoryByJourneyAndSeat(trainJourney, seat);
     if (inventory == null) {
-            throw new RuntimeException("Seat inventory not found");
+            throw new ResourceNotFoundException("Seat inventory not found");
     }
     if (!inventory.getActive()) {
-        throw new RuntimeException("Seat inventory is not active");
+        throw new SeatNotAvailableException("Seat inventory is not active");
     }
     if (inventory.getSeatStatus() == SeatStatus.LOCKED ) {
         Optional<Passenger> passenger=passengerRepository.findByBookingAndSeatInventory(booking,inventory);
@@ -49,11 +51,11 @@ public class ReservationServiceImpl implements ReservationService{
             seatInventoryService.updateSeatInventory(inventory.getId(), inventory);
         }
         else{
-            throw new RuntimeException("Passenger is different");
+            throw new SeatNotAvailableException("Passenger is different");
         }
     }
     else{
-        throw new RuntimeException("Seat is not locked");
+        throw new SeatNotAvailableException("Seat is not locked");
     }
     }
 
@@ -61,10 +63,10 @@ public class ReservationServiceImpl implements ReservationService{
     public void releaseSeat(TrainJourney trainJourney, Seat seat, Booking booking) {
 SeatInventory inventory=seatInventoryService.getInventoryByJourneyAndSeat(trainJourney, seat);
 if (inventory == null) {
-    throw new RuntimeException("Seat inventory not found");
+    throw new ResourceNotFoundException("Seat inventory not found");
 }
 if (!inventory.getActive()) {
-    throw new RuntimeException("Seat inventory is not active");
+    throw new SeatNotAvailableException("Seat inventory is not active");
 }
 if (inventory.getSeatStatus() == SeatStatus.LOCKED) {
     Optional<Passenger>passenger=passengerRepository.findByBookingAndSeatInventory(booking,inventory);
@@ -73,11 +75,11 @@ if (inventory.getSeatStatus() == SeatStatus.LOCKED) {
         seatInventoryService.updateSeatInventory(inventory.getId(), inventory);
     }
     else{
-        throw new RuntimeException("Passenger is different");
+        throw new SeatNotAvailableException("Passenger is different");
     }
 }
 else{
-        throw new RuntimeException("Seat is not locked");
+        throw new SeatNotAvailableException("Seat is not locked");
 }
     }
 }

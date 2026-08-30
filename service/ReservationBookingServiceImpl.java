@@ -1,6 +1,8 @@
 package com.example.trainbooking.service;
 
 import com.example.trainbooking.entity.*;
+import com.example.trainbooking.repository.SeatInventoryRepository;
+import com.example.trainbooking.repository.TrainJourneyRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -8,6 +10,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import com.example.trainbooking.exception.ResourceNotFoundException;
+import com.example.trainbooking.exception.SeatNotAvailableException;
+import com.example.trainbooking.exception.InvalidBookingStateException;
+import com.example.trainbooking.exception.InvalidRequestException;
 
 @Service
 public class ReservationBookingServiceImpl
@@ -18,97 +24,193 @@ public class ReservationBookingServiceImpl
     private final ReservationService reservationService;
     private final PaymentService paymentService;
 
+    private final TrainJourneyRepository trainJourneyRepository;
+    private final SeatInventoryRepository seatInventoryRepository;
+
     public ReservationBookingServiceImpl(
             BookingService bookingService,
             PassengerService passengerService,
             ReservationService reservationService,
-            PaymentService paymentService) {
+            PaymentService paymentService,
+            TrainJourneyRepository trainJourneyRepository,
+            SeatInventoryRepository seatInventoryRepository) {
 
         this.bookingService = bookingService;
         this.passengerService = passengerService;
         this.reservationService = reservationService;
         this.paymentService = paymentService;
+        this.trainJourneyRepository = trainJourneyRepository;
+        this.seatInventoryRepository = seatInventoryRepository;
     }
+
+    // =========================================================
+    // LOAD ACTUAL ENTITIES FROM DATABASE
+    // =========================================================
+
+    private void loadActualEntities(
+            Booking booking,
+            List<Passenger> passengers) {
+
+        // Load actual TrainJourney from database
+        Long journeyId =
+                booking.getTrainJourney().getId();
+
+        TrainJourney journey =
+                trainJourneyRepository.findById(journeyId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Train Journey not found"
+                                ));
+
+        // Replace partial object with actual database entity
+        booking.setTrainJourney(journey);
+
+
+        // Load actual SeatInventory objects
+        for (Passenger passenger : passengers) {
+
+            Long inventoryId =
+                    passenger.getSeatInventory().getId();
+
+            SeatInventory inventory =
+                    seatInventoryRepository.findById(inventoryId)
+                            .orElseThrow(() ->
+                                    new ResourceNotFoundException(
+                                            "Seat Inventory not found"
+                                    ));
+
+            // Replace partial object with actual entity
+            passenger.setSeatInventory(inventory);
+        }
+    }
+
+
+    // =========================================================
+    // VALIDATE BOOKING
+    // =========================================================
 
     private void validateBooking(Booking booking) {
 
         if (booking == null) {
-            throw new RuntimeException("Booking is required");
+            throw new InvalidRequestException(
+                    "Booking is required"
+            );
         }
 
         if (booking.getUser() == null) {
-            throw new RuntimeException("User is required");
+            throw new InvalidRequestException(
+                    "User is required"
+            );
         }
 
         if (booking.getTrainJourney() == null) {
-            throw new RuntimeException("Train journey is required");
+            throw new InvalidRequestException(
+                    "Train journey is required"
+            );
         }
 
-        if (!booking.getTrainJourney().getActive()) {
-            throw new RuntimeException("Train journey is not active");
+        // Boolean.TRUE.equals() prevents NullPointerException
+        if (!Boolean.TRUE.equals(
+                booking.getTrainJourney().getActive())) {
+
+            throw new InvalidRequestException(
+                    "Train journey is not active"
+            );
         }
 
         if (booking.getSourceStation() == null) {
-            throw new RuntimeException("Source station is required");
+            throw new InvalidRequestException(
+                    "Source station is required"
+            );
         }
 
         if (booking.getDestinationStation() == null) {
-            throw new RuntimeException("Destination station is required");
+            throw new InvalidRequestException(
+                    "Destination station is required"
+            );
         }
 
         if (booking.getSourceStation()
                 .equals(booking.getDestinationStation())) {
 
-            throw new RuntimeException(
+            throw new InvalidRequestException(
                     "Source and destination cannot be same"
             );
         }
     }
 
+
+    // =========================================================
+    // VALIDATE PASSENGER
+    // =========================================================
+
     private void validatePassenger(Passenger passenger) {
 
         if (passenger == null) {
-            throw new RuntimeException("Passenger is required");
+            throw new InvalidRequestException(
+                    "Passenger is required"
+            );
         }
 
         if (passenger.getName() == null ||
                 passenger.getName().trim().isEmpty()) {
 
-            throw new RuntimeException("Passenger name is required");
+            throw new InvalidRequestException(
+                    "Passenger name is required"
+            );
         }
 
         if (passenger.getAge() == null ||
                 passenger.getAge() <= 0) {
 
-            throw new RuntimeException(
+            throw new InvalidRequestException(
                     "Passenger age must be greater than 0"
             );
         }
 
         if (passenger.getGender() == null) {
-            throw new RuntimeException("Passenger gender is required");
+
+            throw new InvalidRequestException(
+                    "Passenger gender is required"
+            );
         }
 
         if (passenger.getSeatInventory() == null) {
-            throw new RuntimeException("Seat is required");
+
+            throw new InvalidRequestException(
+                    "Seat is required"
+            );
         }
 
-        if (!passenger.getSeatInventory().getActive()) {
-            throw new RuntimeException(
+        // Boolean.TRUE.equals() prevents NullPointerException
+        if (!Boolean.TRUE.equals(
+                passenger.getSeatInventory().getActive())) {
+
+            throw new SeatNotAvailableException(
                     "Seat inventory is not active"
             );
         }
 
         if (passenger.getSeatInventory().getSeat() == null) {
-            throw new RuntimeException("Seat is required");
+
+            throw new InvalidRequestException(
+                    "Seat is required"
+            );
         }
 
-        if (passenger.getSeatInventory().getTrainJourney() == null) {
-            throw new RuntimeException(
+        if (passenger.getSeatInventory()
+                .getTrainJourney() == null) {
+
+            throw new InvalidRequestException(
                     "Train journey is required for seat"
             );
         }
     }
+
+
+    // =========================================================
+    // BOOK RESERVATION
+    // =========================================================
 
     @Override
     @Transactional
@@ -116,31 +218,68 @@ public class ReservationBookingServiceImpl
             Booking booking,
             List<Passenger> passengers) {
 
-        // 1. Validate booking
-        validateBooking(booking);
+        // -----------------------------------------------------
+        // 1. Basic passenger check
+        // -----------------------------------------------------
 
-        // 2. Validate passengers
-        if (passengers == null || passengers.isEmpty()) {
-            throw new RuntimeException(
+        if (passengers == null ||
+                passengers.isEmpty()) {
+
+            throw new InvalidRequestException(
                     "At least one passenger is required"
             );
         }
 
+
+        // -----------------------------------------------------
+        // 2. Load actual entities from database
+        // -----------------------------------------------------
+
+        loadActualEntities(
+                booking,
+                passengers
+        );
+
+
+        // -----------------------------------------------------
+        // 3. Validate booking
+        // -----------------------------------------------------
+
+        validateBooking(booking);
+
+
+        // -----------------------------------------------------
+        // 4. Validate passengers
+        // -----------------------------------------------------
+
         for (Passenger passenger : passengers) {
+
             validatePassenger(passenger);
         }
 
-        // 3. Create booking
+
+        // -----------------------------------------------------
+        // 5. Create booking
+        // -----------------------------------------------------
+
         Booking savedBooking =
                 bookingService.createBooking(booking);
 
-        // 4. Keep track of successfully reserved passengers
+
+        // -----------------------------------------------------
+        // 6. Keep track of successfully reserved passengers
+        // -----------------------------------------------------
+
         List<Passenger> reservedPassengers =
                 new ArrayList<>();
 
+
         try {
 
-            // 5. Reserve seats and create passengers
+            // =================================================
+            // 7. Reserve seats and create passengers
+            // =================================================
+
             for (Passenger passenger : passengers) {
 
                 passenger.setBooking(savedBooking);
@@ -154,50 +293,102 @@ public class ReservationBookingServiceImpl
                 Seat seat =
                         inventory.getSeat();
 
-                // Lock seat
+
+                // ---------------------------------------------
+                // Lock / reserve seat
+                // ---------------------------------------------
+
                 reservationService.reserveSeat(
                         journey,
                         seat,
                         savedBooking
                 );
 
+
+                // ---------------------------------------------
                 // Create passenger
+                // ---------------------------------------------
+
                 passengerService.createPassenger(
                         passenger
                 );
 
+
+                // ---------------------------------------------
                 // Remember successfully reserved passenger
+                // ---------------------------------------------
+
                 reservedPassengers.add(passenger);
             }
 
-            // 6. Generate unique transaction ID
+
+            // =================================================
+            // 8. Generate transaction ID
+            // =================================================
+
             String transactionId =
                     "TXN-" + UUID.randomUUID();
 
-            // 7. Create ONE payment for the booking
-            Payment payment = new Payment();
+
+            // =================================================
+            // 9. Create payment
+            // =================================================
+
+            Payment payment =
+                    new Payment();
 
             payment.setBooking(savedBooking);
-            payment.setAmount(savedBooking.getTotalFare());
-            payment.setPaymentStatus(PaymentStatus.SUCCESS);
-            payment.setPaymentMethod(PaymentMethod.UPI);
-            payment.setTransactionId(transactionId);
-            payment.setPaymentDateTime(LocalDateTime.now());
-            // 8. Save payment
-            Payment savedPayment =
-                    paymentService.createPayment(payment);
 
-            // 9. Check payment result
+            payment.setAmount(
+                    savedBooking.getTotalFare()
+            );
+
+            payment.setPaymentStatus(
+                    PaymentStatus.SUCCESS
+            );
+
+            payment.setPaymentMethod(
+                    PaymentMethod.UPI
+            );
+
+            payment.setTransactionId(
+                    transactionId
+            );
+
+            payment.setPaymentDateTime(
+                    LocalDateTime.now()
+            );
+
+
+            // =================================================
+            // 10. Save payment
+            // =================================================
+
+            Payment savedPayment =
+                    paymentService.createPayment(
+                            payment
+                    );
+
+
+            // =================================================
+            // 11. Check payment
+            // =================================================
+
             if (savedPayment.getPaymentStatus()
                     != PaymentStatus.SUCCESS) {
 
-                throw new RuntimeException(
+                throw new InvalidBookingStateException(
                         "Payment failed"
                 );
             }
 
-            // 10. Confirm ALL reserved seats
-            for (Passenger passenger : reservedPassengers) {
+
+            // =================================================
+            // 12. Confirm all reserved seats
+            // =================================================
+
+            for (Passenger passenger :
+                    reservedPassengers) {
 
                 SeatInventory inventory =
                         passenger.getSeatInventory();
@@ -207,6 +398,7 @@ public class ReservationBookingServiceImpl
 
                 Seat seat =
                         inventory.getSeat();
+
 
                 reservationService.confirmReservation(
                         journey,
@@ -215,21 +407,34 @@ public class ReservationBookingServiceImpl
                 );
             }
 
-            // 11. Update booking status
+
+            // =================================================
+            // 13. Update booking status
+            // =================================================
+
             savedBooking.setBookingStatus(
                     BookingStatus.CONFIRMED
             );
 
-            // 12. Return confirmed booking
+
+            // =================================================
+            // 14. Save final booking
+            // =================================================
+
             return bookingService.updateBooking(
                     savedBooking.getId(),
                     savedBooking
             );
 
+
         } catch (RuntimeException e) {
 
-            // 13. Release all locked seats
-            for (Passenger passenger : reservedPassengers) {
+            // =================================================
+            // 15. Release all locked seats
+            // =================================================
+
+            for (Passenger passenger :
+                    reservedPassengers) {
 
                 SeatInventory inventory =
                         passenger.getSeatInventory();
@@ -240,16 +445,25 @@ public class ReservationBookingServiceImpl
                 Seat seat =
                         inventory.getSeat();
 
+
                 try {
+
                     reservationService.releaseSeat(
                             journey,
                             seat,
                             savedBooking
                     );
+
                 } catch (RuntimeException ignored) {
-                    // Do not hide the original exception
+
+                    // Do not hide original exception
                 }
             }
+
+
+            // =================================================
+            // 16. Re-throw original exception
+            // =================================================
 
             throw e;
         }

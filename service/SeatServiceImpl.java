@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import com.example.trainbooking.exception.ResourceNotFoundException;
+import com.example.trainbooking.exception.DuplicateResourceException;
 
 @Service
 public class SeatServiceImpl implements SeatService {
@@ -17,7 +19,7 @@ public SeatServiceImpl(SeatRepository seatRepository) {
     @Override
     public Seat createSeat(Seat seat) {
         if(seatRepository.existsByCoachAndSeatNumber(seat.getCoach(),seat.getSeatNumber())){
-            throw new RuntimeException("Already exists");
+            throw new DuplicateResourceException("Already exists");
         }
         return seatRepository.save(seat);
     }
@@ -28,37 +30,57 @@ public SeatServiceImpl(SeatRepository seatRepository) {
         if(seat.isPresent()){
             return seat.get();
         }
-        throw new RuntimeException("Not found");
+        throw new ResourceNotFoundException("Not found");
     }
 
     @Override
     public List<Seat> getAllSeats() {
         return seatRepository.findAll();
     }
-
     @Override
     public Seat updateSeat(Long id, Seat seat) {
 
-        Optional<Seat> optional = seatRepository.findById(id);
+        Seat existingSeat = seatRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Seat not found"
+                        ));
+        if (seat.getCoach() == null ||
+                seat.getCoach().getId() == null) {
 
-        if (!optional.isPresent()) {
-            throw new RuntimeException("Seat not found");
+            throw new IllegalArgumentException(
+                    "Coach is required"
+            );
         }
-        Seat existingSeat = optional.get();
-        boolean coachChanged =
-                !existingSeat.getCoach().equals(seat.getCoach());
-        boolean seatNumberChanged =
-                !existingSeat.getSeatNumber().equals(seat.getSeatNumber());
-        if (coachChanged || seatNumberChanged) {
-            if (seatRepository.existsByCoachAndSeatNumber(
-                    seat.getCoach(),
-                    seat.getSeatNumber())) {
-                throw new RuntimeException("Seat already exists for this coach");
-            }
+        if (seat.getSeatNumber() == null) {
+
+            throw new IllegalArgumentException(
+                    "Seat number is required"
+            );
+        }
+        boolean duplicate =
+                seatRepository
+                        .existsByCoachAndSeatNumberAndIdNot(
+                                seat.getCoach(),
+                                seat.getSeatNumber(),
+                                id
+                        );
+        if (duplicate) {
+
+            throw new DuplicateResourceException(
+                    "Seat already exists for this coach"
+            );
         }
         existingSeat.setCoach(seat.getCoach());
-        existingSeat.setSeatNumber(seat.getSeatNumber());
-        existingSeat.setSeatType(seat.getSeatType());
+        existingSeat.setSeatNumber(
+                seat.getSeatNumber()
+        );
+        existingSeat.setSeatType(
+                seat.getSeatType()
+        );
+        existingSeat.setActive(
+                seat.getActive()
+        );
         return seatRepository.save(existingSeat);
     }
 
@@ -69,7 +91,7 @@ public SeatServiceImpl(SeatRepository seatRepository) {
             oldSeat.get().setActive(false);
             return seatRepository.save(oldSeat.get());
         }
-        throw new RuntimeException("Not found");
+        throw new ResourceNotFoundException("Not found");
     }
 
     @Override

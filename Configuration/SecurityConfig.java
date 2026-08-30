@@ -29,27 +29,43 @@ public class SecurityConfig {
 
         http
 
-                // Disable CSRF for REST API
+                // =========================
+                // CSRF
+                // =========================
                 .csrf(csrf -> csrf.disable())
 
-                // JWT based authentication is stateless
+                // =========================
+                // SESSION
+                // =========================
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
 
-                // Authorization rules
+                // =========================
+                // AUTHORIZATION
+                // =========================
                 .authorizeHttpRequests(auth -> auth
 
-                        // Registration
+                        // =========================
+                        // PUBLIC APIs
+                        // =========================
+
+                        // User registration
                         .requestMatchers(
-                                "/api/users"
+                                "/api/users",
+                                "/api/users/register"
                         ).permitAll()
 
                         // Login
                         .requestMatchers(
                                 "/api/auth/login"
+                        ).permitAll()
+
+                        // Search
+                        .requestMatchers(
+                                "/api/search/**"
                         ).permitAll()
 
                         // Swagger
@@ -59,15 +75,49 @@ public class SecurityConfig {
                                 "/swagger-ui.html"
                         ).permitAll()
 
-                        // Everything else requires JWT
+                        // Error
+                        .requestMatchers(
+                                "/error"
+                        ).permitAll()
+
+                        // =========================
+                        // ADMIN APIs
+                        // =========================
+
+                        .requestMatchers(
+                                "/api/admin/**"
+                        ).hasRole("ADMIN")
+
+                        // =========================
+                        // LOGGED-IN USER APIs
+                        // =========================
+
+                        .requestMatchers(
+                                "/api/reservations/**",
+                                "/api/bookings/**",
+                                "/api/tickets/**"
+                        ).authenticated()
+
+                        // =========================
+                        // EVERYTHING ELSE
+                        // =========================
+
                         .anyRequest().authenticated()
                 )
 
-                // Disable default authentication
+                // =========================
+                // DISABLE FORM LOGIN
+                // =========================
                 .formLogin(form -> form.disable())
+
+                // =========================
+                // DISABLE BASIC AUTH
+                // =========================
                 .httpBasic(basic -> basic.disable())
 
-                // Add our JWT filter
+                // =========================
+                // JWT FILTER
+                // =========================
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
@@ -75,6 +125,10 @@ public class SecurityConfig {
 
         return http.build();
     }
+
+    // =========================
+    // PASSWORD ENCODER
+    // =========================
 
     @Bean
     public PasswordEncoder passwordEncoder() {

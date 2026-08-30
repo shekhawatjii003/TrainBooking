@@ -28,5 +28,7 @@ public class Passenger {
     @ManyToOne(fetch = FetchType.LAZY,optional = false)
     @JoinColumn(nullable = false,name = "seat_inventory_id")
     private SeatInventory seatInventory;
+    @Column(nullable = false)
+    private Boolean active=true;
 
 }

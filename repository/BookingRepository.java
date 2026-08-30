@@ -1,6 +1,7 @@
 package com.example.trainbooking.repository;
 
 import com.example.trainbooking.entity.Booking;
+import com.example.trainbooking.entity.Passenger;
 import com.example.trainbooking.entity.TrainJourney;
 import com.example.trainbooking.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;

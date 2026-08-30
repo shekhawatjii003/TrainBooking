@@ -12,6 +12,7 @@ public interface TrainStopRepository extends JpaRepository<TrainStop, Long> {
     List<TrainStop> findByTrain(Train train);
     Optional<TrainStop> findByTrainAndStation(Train train, Station station);
     List<TrainStop> findByTrainOrderByStopSequenceAsc(Train train);
+    List<TrainStop> findByStation(Station station);
 
 
 }
