@@ -10,10 +10,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import com.example.trainbooking.exception.ResourceNotFoundException;
-import com.example.trainbooking.exception.SeatNotAvailableException;
-import com.example.trainbooking.exception.InvalidBookingStateException;
-import com.example.trainbooking.exception.InvalidRequestException;
 
 @Service
 public class ReservationBookingServiceImpl
@@ -58,7 +54,7 @@ public class ReservationBookingServiceImpl
         TrainJourney journey =
                 trainJourneyRepository.findById(journeyId)
                         .orElseThrow(() ->
-                                new ResourceNotFoundException(
+                                new RuntimeException(
                                         "Train Journey not found"
                                 ));
 
@@ -75,7 +71,7 @@ public class ReservationBookingServiceImpl
             SeatInventory inventory =
                     seatInventoryRepository.findById(inventoryId)
                             .orElseThrow(() ->
-                                    new ResourceNotFoundException(
+                                    new RuntimeException(
                                             "Seat Inventory not found"
                                     ));
 
@@ -92,19 +88,19 @@ public class ReservationBookingServiceImpl
     private void validateBooking(Booking booking) {
 
         if (booking == null) {
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Booking is required"
             );
         }
 
         if (booking.getUser() == null) {
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "User is required"
             );
         }
 
         if (booking.getTrainJourney() == null) {
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Train journey is required"
             );
         }
@@ -113,19 +109,19 @@ public class ReservationBookingServiceImpl
         if (!Boolean.TRUE.equals(
                 booking.getTrainJourney().getActive())) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Train journey is not active"
             );
         }
 
         if (booking.getSourceStation() == null) {
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Source station is required"
             );
         }
 
         if (booking.getDestinationStation() == null) {
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Destination station is required"
             );
         }
@@ -133,7 +129,7 @@ public class ReservationBookingServiceImpl
         if (booking.getSourceStation()
                 .equals(booking.getDestinationStation())) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Source and destination cannot be same"
             );
         }
@@ -147,7 +143,7 @@ public class ReservationBookingServiceImpl
     private void validatePassenger(Passenger passenger) {
 
         if (passenger == null) {
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Passenger is required"
             );
         }
@@ -155,7 +151,7 @@ public class ReservationBookingServiceImpl
         if (passenger.getName() == null ||
                 passenger.getName().trim().isEmpty()) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Passenger name is required"
             );
         }
@@ -163,21 +159,21 @@ public class ReservationBookingServiceImpl
         if (passenger.getAge() == null ||
                 passenger.getAge() <= 0) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Passenger age must be greater than 0"
             );
         }
 
         if (passenger.getGender() == null) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Passenger gender is required"
             );
         }
 
         if (passenger.getSeatInventory() == null) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Seat is required"
             );
         }
@@ -186,14 +182,14 @@ public class ReservationBookingServiceImpl
         if (!Boolean.TRUE.equals(
                 passenger.getSeatInventory().getActive())) {
 
-            throw new SeatNotAvailableException(
+            throw new RuntimeException(
                     "Seat inventory is not active"
             );
         }
 
         if (passenger.getSeatInventory().getSeat() == null) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Seat is required"
             );
         }
@@ -201,7 +197,7 @@ public class ReservationBookingServiceImpl
         if (passenger.getSeatInventory()
                 .getTrainJourney() == null) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "Train journey is required for seat"
             );
         }
@@ -225,7 +221,7 @@ public class ReservationBookingServiceImpl
         if (passengers == null ||
                 passengers.isEmpty()) {
 
-            throw new InvalidRequestException(
+            throw new RuntimeException(
                     "At least one passenger is required"
             );
         }
@@ -377,7 +373,7 @@ public class ReservationBookingServiceImpl
             if (savedPayment.getPaymentStatus()
                     != PaymentStatus.SUCCESS) {
 
-                throw new InvalidBookingStateException(
+                throw new RuntimeException(
                         "Payment failed"
                 );
             }

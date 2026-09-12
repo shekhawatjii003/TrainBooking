@@ -1,176 +1,159 @@
 package com.example.trainbooking.service;
 
 import com.example.trainbooking.entity.Booking;
+import com.example.trainbooking.entity.BookingStatus;
 import com.example.trainbooking.entity.Payment;
 import com.example.trainbooking.entity.PaymentStatus;
+import com.example.trainbooking.entity.User;
+import com.example.trainbooking.exception.ResourceNotFoundException;
+import com.example.trainbooking.exception.UnauthorizedException;
 import com.example.trainbooking.repository.PaymentRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-
-import com.example.trainbooking.exception.ResourceNotFoundException;
-import com.example.trainbooking.exception.DuplicateResourceException;
-import com.example.trainbooking.exception.InvalidBookingStateException;
-import com.example.trainbooking.exception.InvalidRequestException;
 
 @Service
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final UserService userService;
     private final BookingService bookingService;
 
     public PaymentServiceImpl(
             PaymentRepository paymentRepository,
+            UserService userService,
             BookingService bookingService) {
 
         this.paymentRepository = paymentRepository;
+        this.userService = userService;
         this.bookingService = bookingService;
+    }
+
+    // Get currently logged-in user from the JWT
+    private User getLoggedInUser() {
+        Authentication authentication =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication();
+
+        String email = authentication.getName();
+
+        return userService.getUserByEmail(email);
     }
 
     @Override
     public Payment createPayment(Payment payment) {
-
-        if (paymentRepository.existsByBooking(
-                payment.getBooking())) {
-
-            throw new DuplicateResourceException(
-                    "Booking already exists"
-            );
+        if (paymentRepository.existsByBooking(payment.getBooking())) {
+            throw new RuntimeException("Booking already exists");
         }
-
-        if (paymentRepository.existsByTransactionId(
-                payment.getTransactionId())) {
-
-            throw new DuplicateResourceException(
-                    "Payment already exists"
-            );
+        if (paymentRepository.existsByTransactionId(payment.getTransactionId())) {
+            throw new RuntimeException("Payment already exists");
         }
-
         return paymentRepository.save(payment);
     }
 
     @Override
     public Payment getPayment(Long id) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Payment not found")
+                );
 
-        Optional<Payment> payment =
-                paymentRepository.findById(id);
+        User loggedInUser = getLoggedInUser();
 
-        if (payment.isPresent()) {
-            return payment.get();
+        boolean isAdmin = "ADMIN".equals(loggedInUser.getRole());
+        boolean isOwner = payment.getBooking().getUser().getId()
+                .equals(loggedInUser.getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new UnauthorizedException(
+                    "You are not authorized to view this payment"
+            );
         }
 
-        throw new ResourceNotFoundException(
-                "Payment not found"
-        );
+        return payment;
     }
 
     @Override
-    public Payment updatePayment(
-            Long id,
-            Payment payment) {
-
-        Optional<Payment> oldPayment =
-                paymentRepository.findById(id);
-
+    public Payment updatePayment(Long id, Payment payment) {
+        Optional<Payment> oldPayment = paymentRepository.findById(id);
         if (!oldPayment.isPresent()) {
-
-            throw new ResourceNotFoundException(
-                    "Payment not found"
-            );
+            throw new ResourceNotFoundException("Payment not found");
         }
-
-        if (!oldPayment.get()
-                .getBooking()
-                .equals(payment.getBooking())) {
-
-            throw new InvalidRequestException(
-                    "Booking can not be updated"
-            );
+        if (!oldPayment.get().getBooking().equals(payment.getBooking())) {
+            throw new RuntimeException("Booking can not be updated");
         }
-
-        oldPayment.get().setPaymentMethod(
-                payment.getPaymentMethod()
-        );
-
-        oldPayment.get().setPaymentStatus(
-                payment.getPaymentStatus()
-        );
-
-        return paymentRepository.save(
-                oldPayment.get()
-        );
+        oldPayment.get().setPaymentMethod(payment.getPaymentMethod());
+        oldPayment.get().setPaymentStatus(payment.getPaymentStatus());
+        return paymentRepository.save(oldPayment.get());
     }
 
     @Override
+    @Transactional
     public Payment refundPayment(Long id) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Payment not found")
+                );
 
-        Optional<Payment> paymentOptional =
-                paymentRepository.findById(id);
-
-        if (!paymentOptional.isPresent()) {
-
-            throw new ResourceNotFoundException(
-                    "Payment not found"
-            );
-        }
-
-        Payment payment = paymentOptional.get();
-
-        // Payment must be successful
-        if (payment.getPaymentStatus()
-                != PaymentStatus.SUCCESS) {
-
-            throw new InvalidBookingStateException(
+        if (payment.getPaymentStatus() != PaymentStatus.SUCCESS) {
+            throw new RuntimeException(
                     "Only successful payment can be refunded"
             );
         }
 
-        // First cancel booking.
-        // Existing BookingService will handle
-        // booking cancellation and seat release.
+        User loggedInUser = getLoggedInUser();
+
+        boolean isAdmin = "ADMIN".equals(loggedInUser.getRole());
+        boolean isOwner = payment.getBooking().getUser().getId()
+                .equals(loggedInUser.getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new UnauthorizedException(
+                    "You are not authorized to refund this payment"
+            );
+        }
+
         Booking booking = payment.getBooking();
 
-        bookingService.cancelBooking(
-                booking.getId()
-        );
+        // Avoid re-cancelling an already cancelled booking (previously caused a 409)
+        if (booking.getBookingStatus() != BookingStatus.CANCELLED) {
+            bookingService.cancelBooking(booking.getId());
+        }
 
-        // Now refund payment
-        payment.setPaymentStatus(
-                PaymentStatus.REFUNDED
-        );
+        payment.setPaymentStatus(PaymentStatus.REFUNDED);
 
         return paymentRepository.save(payment);
     }
 
     @Override
-    public List<Payment> getPaymentByBooking(
-            Booking booking) {
-
-        List<Payment> payments =
-                paymentRepository.findByBooking(booking);
-
-        if (payments.isEmpty()) {
-
-            throw new ResourceNotFoundException(
-                    "Payment not found"
-            );
+    public List<Payment> getPaymentByBooking(Booking booking) {
+        List<Payment> payment = paymentRepository.findByBooking(booking);
+        if (!payment.isEmpty()) {
+            return payment;
         }
-
-        return payments;
+        throw new ResourceNotFoundException("Payment not found");
     }
 
     @Override
     public List<Payment> getAllPayments() {
+        User loggedInUser = getLoggedInUser();
 
-        List<Payment> payments =
-                paymentRepository.findAll();
+        List<Payment> payments;
+
+        if ("ADMIN".equals(loggedInUser.getRole())) {
+            payments = paymentRepository.findAll();
+        } else {
+            payments = paymentRepository
+                    .findPaymentsByUserEmail(loggedInUser.getEmail());
+        }
 
         if (payments.isEmpty()) {
-
-            throw new ResourceNotFoundException(
-                    "Payment not found"
-            );
+            throw new ResourceNotFoundException("Payment not found");
         }
 
         return payments;

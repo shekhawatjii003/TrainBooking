@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -28,14 +29,8 @@ public class BookingController {
         this.userService = userService;
     }
 
-    // =========================================================
-    // GET MY BOOKINGS
-    // =========================================================
-
-    @GetMapping("/my")
-    public ResponseEntity<List<BookingResponse>> getMyBookings() {
-
-        // Get logged-in user from JWT
+    // Get currently logged-in user from the JWT
+    private User getLoggedInUser() {
         Authentication authentication =
                 SecurityContextHolder
                         .getContext()
@@ -43,187 +38,87 @@ public class BookingController {
 
         String email = authentication.getName();
 
-        // Find user
-        User user =
-                userService.getUserByEmail(email);
-
-        // Get user's bookings
-        List<Booking> bookings =
-                bookingService.getBookingsByUser(user);
-
-        // Convert Booking -> BookingResponse
-        List<BookingResponse> response =
-                bookings.stream()
-                        .map(this::mapToResponse)
-                        .toList();
-
-        return ResponseEntity.ok(response);
+        return userService.getUserByEmail(email);
     }
 
+    // Get my bookings
+    @GetMapping("/my")
+    public ResponseEntity<List<BookingResponse>> getMyBookings() {
 
-    // =========================================================
-    // CANCEL MY BOOKING
-    // =========================================================
+        User user = getLoggedInUser();
+
+        List<BookingResponse> bookings =
+                bookingService.getBookingsByUser(user)
+                        .stream()
+                        .map(BookingResponse::from)
+                        .collect(Collectors.toList());
+
+        return ResponseEntity.ok(bookings);
+    }
+
+    // Get a single booking - ADMIN can view any, USER only their own
+    @GetMapping("/{id}")
+    public ResponseEntity<BookingResponse> getBooking(
+            @PathVariable Long id) {
+
+        User user = getLoggedInUser();
+
+        Booking booking = bookingService.getBookingById(id);
+
+        boolean isAdmin = "ADMIN".equals(user.getRole());
+        boolean isOwner = booking.getUser().getId().equals(user.getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new UnauthorizedException(
+                    "You are not authorized to view this booking"
+            );
+        }
+
+        return ResponseEntity.ok(BookingResponse.from(booking));
+    }
+
+    // Get all bookings - ADMIN only
+    @GetMapping
+    public ResponseEntity<List<BookingResponse>> getAllBookings() {
+
+        User user = getLoggedInUser();
+
+        if (!"ADMIN".equals(user.getRole())) {
+            throw new UnauthorizedException(
+                    "You are not authorized to view all bookings"
+            );
+        }
+
+        List<BookingResponse> bookings =
+                bookingService.getAllBookings()
+                        .stream()
+                        .map(BookingResponse::from)
+                        .collect(Collectors.toList());
+
+        return ResponseEntity.ok(bookings);
+    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<BookingResponse> cancelBooking(
             @PathVariable Long id) {
 
-        // Get logged-in user from JWT
-        Authentication authentication =
-                SecurityContextHolder
-                        .getContext()
-                        .getAuthentication();
+        User user = getLoggedInUser();
 
-        String email = authentication.getName();
+        Booking booking = bookingService.getBookingById(id);
 
-        // Find logged-in user
-        User user =
-                userService.getUserByEmail(email);
+        boolean isAdmin = "ADMIN".equals(user.getRole());
+        boolean isOwner = booking.getUser().getId().equals(user.getId());
 
-        // Find booking
-        Booking booking =
-                bookingService.getBookingById(id);
-
-        // Check ownership
-        if (!booking.getUser().getId()
-                .equals(user.getId())) {
-
+        // Check ownership (ADMIN can cancel any booking)
+        if (!isAdmin && !isOwner) {
             throw new UnauthorizedException(
                     "You are not authorized to cancel this booking"
             );
         }
 
-        // Cancel booking
         Booking cancelledBooking =
                 bookingService.cancelBooking(id);
 
-        // Convert to DTO
-        BookingResponse response =
-                mapToResponse(cancelledBooking);
-
-        return ResponseEntity.ok(response);
-    }
-
-
-    // =========================================================
-    // BOOKING -> BOOKING RESPONSE
-    // =========================================================
-
-    private BookingResponse mapToResponse(
-            Booking booking) {
-
-        BookingResponse response =
-                new BookingResponse();
-
-        // -----------------------------------------------------
-        // Booking information
-        // -----------------------------------------------------
-
-        response.setId(
-                booking.getId()
-        );
-
-        response.setPnr(
-                booking.getPnr()
-        );
-
-
-        // -----------------------------------------------------
-        // User information
-        // -----------------------------------------------------
-
-        if (booking.getUser() != null) {
-
-            response.setUserId(
-                    booking.getUser().getId()
-            );
-
-            response.setUserName(
-                    booking.getUser().getName()
-            );
-
-            response.setUserEmail(
-                    booking.getUser().getEmail()
-            );
-
-            response.setUserRole(
-                    booking.getUser().getRole()
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // Train Journey information
-        // -----------------------------------------------------
-
-        if (booking.getTrainJourney() != null) {
-
-            response.setTrainJourneyId(
-                    booking.getTrainJourney().getId()
-            );
-
-            // Train information
-            if (booking.getTrainJourney().getTrain() != null) {
-
-                response.setTrainNumber(
-                        booking.getTrainJourney()
-                                .getTrain()
-                                .getTrainNumber()
-                );
-
-                response.setTrainName(
-                        booking.getTrainJourney()
-                                .getTrain()
-                                .getTrainName()
-                );
-            }
-        }
-
-
-        // -----------------------------------------------------
-        // Source Station
-        // -----------------------------------------------------
-
-        if (booking.getSourceStation() != null) {
-
-            response.setSourceStation(
-                    booking.getSourceStation()
-                            .getStationCode()
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // Destination Station
-        // -----------------------------------------------------
-
-        if (booking.getDestinationStation() != null) {
-
-            response.setDestinationStation(
-                    booking.getDestinationStation()
-                            .getStationCode()
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // Booking details
-        // -----------------------------------------------------
-
-        response.setBookingDateTime(
-                booking.getBookingDateTime()
-        );
-
-        response.setBookingStatus(
-                booking.getBookingStatus()
-        );
-
-        response.setTotalFare(
-                booking.getTotalFare()
-        );
-
-
-        return response;
+        return ResponseEntity.ok(BookingResponse.from(cancelledBooking));
     }
 }

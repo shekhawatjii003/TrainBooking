@@ -2,14 +2,13 @@ package com.example.trainbooking.service;
 
 import com.example.trainbooking.entity.Booking;
 import com.example.trainbooking.entity.Passenger;
+import com.example.trainbooking.exception.InvalidRequestException;
+import com.example.trainbooking.exception.ResourceNotFoundException;
 import com.example.trainbooking.repository.PassengerRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import com.example.trainbooking.exception.ResourceNotFoundException;
-import com.example.trainbooking.exception.DuplicateResourceException;
-import com.example.trainbooking.exception.InvalidRequestException;
 
 @Service
 public class PassengerServiceImpl implements PassengerService {
@@ -33,7 +32,7 @@ public class PassengerServiceImpl implements PassengerService {
                         passenger.getAge(),
                         passenger.getGender())) {
 
-            throw new DuplicateResourceException(
+            throw new InvalidRequestException(
                     "Passenger already exists in this booking"
             );
         }

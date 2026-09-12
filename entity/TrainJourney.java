@@ -34,5 +34,5 @@ public class TrainJourney {
     @Column(nullable = false,name = "journey_status")
     private JourneyStatus status;
     @Column(nullable = false)
-    private Boolean active;
+    private Boolean active=true;
 }

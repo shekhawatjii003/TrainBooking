@@ -4,7 +4,6 @@ import com.example.trainbooking.entity.Station;
 import com.example.trainbooking.entity.Train;
 import com.example.trainbooking.entity.TrainJourney;
 import com.example.trainbooking.entity.TrainStop;
-import com.example.trainbooking.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -70,8 +69,8 @@ public class SearchServiceImpl implements SearchService {
                             result.add(journey);
                         }
 
-                    } catch (ResourceNotFoundException e) {
-                        throw new ResourceNotFoundException("No Journey is existing for particular date");
+                    } catch (RuntimeException e) {
+                        throw new RuntimeException("No Journey is existing for particular date");
                     }
 
                     break;

@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Entity
 @Getter
 @Setter
@@ -32,8 +34,9 @@ public class SeatInventory {
     private Seat seat;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private SeatStatus SeatStatus;
+    private SeatStatus seatStatus;
     @Column(nullable = false)
     private Boolean active;
+
 
 }

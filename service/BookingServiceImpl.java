@@ -1,6 +1,8 @@
 package com.example.trainbooking.service;
 
 import com.example.trainbooking.entity.*;
+import com.example.trainbooking.exception.InvalidRequestException;
+import com.example.trainbooking.exception.ResourceNotFoundException;
 import com.example.trainbooking.repository.BookingRepository;
 import com.example.trainbooking.repository.PassengerRepository;
 import com.example.trainbooking.repository.SeatInventoryRepository;
@@ -10,9 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import com.example.trainbooking.exception.ResourceNotFoundException;
-import com.example.trainbooking.exception.InvalidBookingStateException;
-import com.example.trainbooking.exception.InvalidRequestException;
 
 @Service
 public class BookingServiceImpl implements BookingService {
@@ -279,7 +278,7 @@ public class BookingServiceImpl implements BookingService {
 
         // 2. Check booking status
         if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
-            throw new InvalidBookingStateException("Booking already cancelled");
+            throw new InvalidRequestException("Booking already cancelled");
         }
 
         // 3. Get passengers

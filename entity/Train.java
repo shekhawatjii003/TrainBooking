@@ -23,5 +23,5 @@ public class Train {
     @Column(nullable = false)
     private type trainType;
     @Column(nullable = false)
-    private boolean active;
+    private Boolean active;
 }

@@ -1,6 +1,5 @@
 package com.example.trainbooking.controller;
 
-import com.example.trainbooking.dto.BookingResponse;
 import com.example.trainbooking.dto.ReservationBookingRequest;
 import com.example.trainbooking.entity.Booking;
 import com.example.trainbooking.entity.Passenger;
@@ -35,13 +34,8 @@ public class ReservationBookingController {
         this.userService = userService;
     }
 
-
-    // =========================================================
-    // BOOK RESERVATION
-    // =========================================================
-
     @PostMapping("/book")
-    public ResponseEntity<BookingResponse> bookReservation(
+    public ResponseEntity<Booking> bookReservation(
             @Valid @RequestBody ReservationBookingRequest request) {
 
         // 1. Get logged-in user from JWT
@@ -50,12 +44,11 @@ public class ReservationBookingController {
                         .getContext()
                         .getAuthentication();
 
-        // 2. Get email from JWT
+        // 2. Get user's email from JWT
         String email = authentication.getName();
 
-        // 3. Find user
-        User user =
-                userService.getUserByEmail(email);
+        // 3. Find user in database
+        User user = userService.getUserByEmail(email);
 
         // 4. Convert BookingRequest -> Booking
         Booking booking =
@@ -80,134 +73,10 @@ public class ReservationBookingController {
                         passengers
                 );
 
-        // 8. Convert Booking -> BookingResponse
-        BookingResponse response =
-                mapToResponse(savedBooking);
-
-        // 9. Return clean response
+        // 8. Return response
         return new ResponseEntity<>(
-                response,
+                savedBooking,
                 HttpStatus.CREATED
         );
-    }
-
-
-    // =========================================================
-    // BOOKING -> BOOKING RESPONSE
-    // =========================================================
-
-    private BookingResponse mapToResponse(
-            Booking booking) {
-
-        BookingResponse response =
-                new BookingResponse();
-
-        // -----------------------------------------------------
-        // Booking
-        // -----------------------------------------------------
-
-        response.setId(
-                booking.getId()
-        );
-
-        response.setPnr(
-                booking.getPnr()
-        );
-
-
-        // -----------------------------------------------------
-        // User
-        // -----------------------------------------------------
-
-        if (booking.getUser() != null) {
-
-            response.setUserId(
-                    booking.getUser().getId()
-            );
-
-            response.setUserName(
-                    booking.getUser().getName()
-            );
-
-            response.setUserEmail(
-                    booking.getUser().getEmail()
-            );
-
-            response.setUserRole(
-                    booking.getUser().getRole()
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // Train Journey
-        // -----------------------------------------------------
-
-        if (booking.getTrainJourney() != null) {
-
-            response.setTrainJourneyId(
-                    booking.getTrainJourney().getId()
-            );
-
-            if (booking.getTrainJourney().getTrain() != null) {
-
-                response.setTrainNumber(
-                        booking.getTrainJourney()
-                                .getTrain()
-                                .getTrainNumber()
-                );
-
-                response.setTrainName(
-                        booking.getTrainJourney()
-                                .getTrain()
-                                .getTrainName()
-                );
-            }
-        }
-
-
-        // -----------------------------------------------------
-        // Source Station
-        // -----------------------------------------------------
-
-        if (booking.getSourceStation() != null) {
-
-            response.setSourceStation(
-                    booking.getSourceStation()
-                            .getStationCode()
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // Destination Station
-        // -----------------------------------------------------
-
-        if (booking.getDestinationStation() != null) {
-
-            response.setDestinationStation(
-                    booking.getDestinationStation()
-                            .getStationCode()
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // Booking details
-        // -----------------------------------------------------
-
-        response.setBookingDateTime(
-                booking.getBookingDateTime()
-        );
-
-        response.setBookingStatus(
-                booking.getBookingStatus()
-        );
-
-        response.setTotalFare(
-                booking.getTotalFare()
-        );
-
-        return response;
     }
 }

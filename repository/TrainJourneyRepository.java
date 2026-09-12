@@ -10,9 +10,4 @@ import java.util.Optional;
 public interface TrainJourneyRepository extends JpaRepository<TrainJourney, Long> {
     Optional<TrainJourney> findByTrainAndJourneyDate(Train train, LocalDate journeyDate);
     Boolean existsByTrainAndJourneyDate(Train train, LocalDate journeyDate);
-    boolean existsByTrainAndJourneyDateAndIdNot(
-            Train train,
-            LocalDate journeyDate,
-            Long id
-    );
 }
